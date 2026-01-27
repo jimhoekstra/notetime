@@ -46,7 +46,9 @@ class NoteTextArea(TextArea):
         note_id_input: NoteIDInput,
     ) -> list[Widget]:
         assert self.value is not None
-
+        if note_id_input.value != "1":
+            return []
+        
         con, cur = get_db_connection()
         note = get_note_by_id(cur, note_id=int(note_id_input.value))
         assert note is not None
@@ -114,9 +116,6 @@ class SaveButton(Button):
             notifications.push(f"Updated note {updated_note.id}")
 
         con.close()
-
-        # note_textarea.value = ""
-        # note_id_input.value = "1"
 
         return [notifications]
 

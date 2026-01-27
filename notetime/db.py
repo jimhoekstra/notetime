@@ -1,4 +1,5 @@
 import sqlite3
+from pathlib import Path
 from datetime import datetime, timezone
 
 from pydantic import BaseModel, Field
@@ -10,7 +11,7 @@ def adapt_datetime_iso(dt: datetime) -> str:
 
 sqlite3.register_adapter(datetime, adapt_datetime_iso)
 
-PATH_TO_DB = "db.sqlite3"
+PATH_TO_DB = Path.cwd() / "data" / "db.sqlite3"
 
 
 def get_db_connection() -> tuple[sqlite3.Connection, sqlite3.Cursor]:

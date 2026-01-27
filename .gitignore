@@ -8,4 +8,4 @@ wheels/
 
 # Virtual environments
 .venv
-db.sqlite3
+data/
