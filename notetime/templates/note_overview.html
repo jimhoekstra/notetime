@@ -1,0 +1,50 @@
+<main>
+    <div class="vertical">
+        <div class="horizontal space-between">
+            <h1>NoteTime</h1>
+            <a href="/" class="link">New</a>
+        </div>
+        {{ widgets["note-search-input"] | safe }}
+        {{ widgets["note-grid"] | safe }}
+    </div>
+    
+</main>
+
+<style>
+    main {
+        width: 1000px;
+        margin: 0 auto;
+    }
+
+    a {
+        color: black;
+        text-decoration: none;
+    }
+
+    .link {
+        color: hsl(213, 70%, 45%);
+        text-decoration: underline;
+    }
+
+    h1 {
+        font-weight: 400;
+        margin: 0;
+        margin-top: 1em;
+    }
+
+    .vertical {
+        display: flex;
+        flex-direction: column;
+        gap: 1em;
+    }
+
+    .horizontal {
+        display: flex;
+        gap: 1em;
+    }
+
+    .space-between {
+        justify-content: space-between;
+        align-items: end;
+    }
+</style>
