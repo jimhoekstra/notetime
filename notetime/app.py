@@ -37,7 +37,7 @@ class NoteIDInput(Input):
 
 class NoteTextArea(TextArea):
     id: str = "note-textarea"
-    rows: int = 15
+    rows: int = 20
     autofocus: bool = True
     placeholder: str = "write a new note..."
 
