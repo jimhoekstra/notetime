@@ -2,7 +2,11 @@
     <div class="vertical">
         <div class="horizontal space-between">
             <h1></h1>
-            <a href="/" class="link">New</a>
+            <div>
+                <a href="/stats" class="link">Statistics</a>
+                <a href="/" class="link">New</a>
+                <a href="/notes" class="link">Overview</a>
+            </div>
         </div>
         {{ widgets["note-search-input"] | safe }}
         {{ widgets["note-grid"] | safe }}

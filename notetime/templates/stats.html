@@ -8,25 +8,17 @@
                 <a href="/notes" class="link">Overview</a>
             </div>
         </div>
-        
-        <div>
-            {{ widgets["note-id-input"] | safe }}
-            {{ widgets["note-description"] | safe }}
-            {{ widgets["note-textarea"] | safe }}
-        </div>
-        
-        <div class="horizontal">
-            {{ widgets["save-button"] | safe }}
-            {{ widgets["clear-button"] | safe }}
-        </div>
+    </div>
 
+    <div class="chart">
+        {{ widgets["test-bar-chart"] | safe }}
     </div>
 </main>
 
 <style>
     main {
         width: 1000px;
-        margin: 0 auto;
+        margin: 0 auto 5em auto;
     }
 
     a {
@@ -37,6 +29,14 @@
         font-weight: 400;
         margin: 0;
         margin-top: 1em;
+    }
+
+    .chart {
+        height: 400px;
+        background-color: hsl(28, 100%, 90%);
+        padding: 1em;
+        border-radius: 0.25em;
+        margin: 1em 0;
     }
 
     .horizontal {

@@ -2,7 +2,15 @@ from pathlib import Path
 from typing import Type
 
 from newsflash import App, Page
-from newsflash.widgets import TextArea, Input, Button, Notifications, Grid
+from newsflash.widgets import (
+    TextArea,
+    Input,
+    Button,
+    Notifications,
+    Grid,
+    BarChart,
+    Paragraph,
+)
 from newsflash.widgets.widgets import Widget
 
 from notetime.db import (
@@ -44,25 +52,42 @@ class NoteTextArea(TextArea):
     def on_input(
         self,
         note_id_input: NoteIDInput,
+        notifications: Notifications,
     ) -> list[Widget]:
         assert self.value is not None
-        if note_id_input.value != "1":
-            return []
-        
-        con, cur = get_db_connection()
-        note = get_note_by_id(cur, note_id=int(note_id_input.value))
-        assert note is not None
+        note_id = int(note_id_input.value)
 
-        note.text = self.value
-        update_note(con, cur, note)
+        con, cur = get_db_connection()
+        current_note = get_note_by_id(cur, note_id=note_id)
+        assert current_note is not None
+
+        text = self.value
+        title = text.splitlines()[0] if text else ""
+        if len(text.splitlines()) > 1:
+            text = "\n".join(text.splitlines()[1:])
+        else:
+            text = ""
+
+        current_note.id = note_id
+        current_note.title = title
+        current_note.text = text
+        current_note.set_updated_at_now()
+
+        updated_note = update_note(
+            con=con,
+            cur=cur,
+            note=current_note,
+        )
+
+        notifications.push(f"Updated note {updated_note.id}")
 
         con.close()
-        return []
+        return [notifications]
 
 
 class SaveButton(Button):
     id: str = "save-button"
-    label: str = "Save"
+    label: str = "Create Note"
 
     def on_click(
         self,
@@ -75,45 +100,23 @@ class SaveButton(Button):
 
         assert note_textarea.value is not None
 
-        if note_id == 1:
-            buffer_note = get_in_progress_note(cur=cur)
+        assert note_id == 1
+        buffer_note = get_in_progress_note(cur=cur)
 
-            # Make sure the buffer note contains the current content
-            # of the textarea element before saving
-            assert note_textarea.value == buffer_note.text
-            new_note = create_note(
-                con=con,
-                cur=cur,
-                text=note_textarea.value,
-            )
+        # Make sure the buffer note contains the current content
+        # of the textarea element before saving
+        assert note_textarea.value == buffer_note.get_full_text()
+        new_note = create_note(
+            con=con,
+            cur=cur,
+            text=note_textarea.value,
+        )
 
-            buffer_note.text = ""
-            update_note(con=con, cur=cur, note=buffer_note)
+        buffer_note.title = ""
+        buffer_note.text = ""
+        update_note(con=con, cur=cur, note=buffer_note)
 
-            notifications.push(f"Created new note with ID {new_note.id}")
-        else:
-            current_note = get_note_by_id(cur=cur, note_id=note_id)
-            assert current_note is not None
-
-            text = note_textarea.value
-            title = text.splitlines()[0] if text else ""
-            if len(text.splitlines()) > 1:
-                text = "\n".join(text.splitlines()[1:])
-            else:
-                text = ""
-
-            current_note.id = note_id
-            current_note.title = title
-            current_note.text = text
-            current_note.set_updated_at_now()
-
-            updated_note = update_note(
-                con=con,
-                cur=cur,
-                note=current_note,
-            )
-
-            notifications.push(f"Updated note {updated_note.id}")
+        notifications.push(f"Created new note with ID {new_note.id}")
 
         con.close()
 
@@ -128,17 +131,22 @@ class ClearButton(Button):
         self,
         note_id_input: NoteIDInput,
         note_textarea: NoteTextArea,
+        note_description: "NoteDescription",
+        create_note: SaveButton,
     ) -> list[Widget]:
         note_id_input.value = "1"
         note_textarea.value = ""
+        note_description.text = "Creating a new note. Press save to create."
+        create_note.disabled = False
 
         con, cur = get_db_connection()
         note = get_in_progress_note(cur=cur)
+        note.title = ""
         note.text = ""
         update_note(con=con, cur=cur, note=note)
 
         con.close()
-        return [note_id_input, note_textarea]
+        return [note_id_input, note_textarea, note_description, create_note]
 
 
 class EditNoteButton(Button):
@@ -215,6 +223,11 @@ class NoteGrid(Grid[NoteWidget]):
         return super()._post_init()
 
 
+class NoteDescription(Paragraph):
+    id: str = "note-description"
+    text: str = ""
+
+
 class NewNotePage(Page):
     id: str = "new-note-page"
     path: str = "/"
@@ -229,10 +242,16 @@ class NewNotePage(Page):
         assert note is not None
         con.close()
 
+        if self.note_id == 1:
+            note_description: str = "Creating a new note. Press save to create."
+        else:
+            note_description: str = f"Editing note: {note.title} (id: {note.id}). Updates are saved automatically."
+
         self.children = [
             NoteIDInput(value=str(self.note_id)),
+            NoteDescription(text=note_description),
             NoteTextArea(value=note.get_full_text()),
-            SaveButton(),
+            SaveButton(disabled=note.id != 1),
             ClearButton(),
         ]
         return super()._post_init()
@@ -249,7 +268,31 @@ note_overview_page = Page(
     ],
 )
 
+
+class TestBar(BarChart):
+    id: str = "test-bar-chart"
+    title: str = "Test Bar Chart"
+
+    def on_load(self) -> list[Widget]:
+        # TODO: Replace with real data
+        self.set_values(
+            labels=["A", "B", "C", "D", "E", "F", "G", "H", "I", "J"],
+            values=[10, 20, 15, 25, 5, 30, 12, 18, 22, 8],
+        )
+        return [self]
+
+
+stats_page = Page(
+    id="stats-page",
+    path="/stats",
+    title="Stats",
+    template=("templates", "stats.html"),
+    children=[
+        TestBar(),
+    ],
+)
+
 app = App(
-    pages=[NewNotePage(), note_overview_page],
+    pages=[NewNotePage(), note_overview_page, stats_page],
     template_folders=[("templates", Path.cwd() / "notetime" / "templates")],
 )
