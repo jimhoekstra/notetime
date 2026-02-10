@@ -7,6 +7,8 @@ from notetime.db import (
     create_note,
     update_note,
     get_note_by_id,
+    get_all_tags,
+    get_notes_by_tags,
 )
 
 
@@ -35,38 +37,36 @@ class TestDB(TestCase):
         note = create_note(
             con=self.con,
             cur=self.cur,
-            text="Test note\nThis is a test note.",
-            tags=["test", "note"],
+            text="Test note\nThis is a @test @note.",
         )
         self.assertIsNotNone(note.id)
         assert note.id is not None
 
-        # TODO: Uncomment when tags are implemented in create_note
-        # all_tags = set(get_all_tags(self.cur))
-        # self.assertEqual(all_tags, {"test", "note"})
+        all_tags = set([tag.name for tag in get_all_tags(self.cur)])
+        self.assertEqual(all_tags, {"test", "note"})
 
         retrieved_note = get_note_by_id(self.cur, note.id)
+
         self.assertIsNotNone(retrieved_note)
         assert retrieved_note is not None
+        assert retrieved_note.tags is not None
 
         self.assertEqual(retrieved_note.title, "Test note")
-        self.assertEqual(retrieved_note.text, "This is a test note.")
-        # TODO: Uncomment when tags are implemented in create_note
-        # self.assertEqual(set(retrieved_note.tags), {"test", "note"})
+        self.assertEqual(retrieved_note.text, "This is a @test @note.")
+        self.assertEqual(set(retrieved_note.tags), {"test", "note"})
 
     def test_update_note(self):
         note = create_note(
             con=self.con,
             cur=self.cur,
-            text="Test note\nThis is the initial note.",
+            text="Test note\nThis is the @initial note.",
         )
 
         self.assertIsNotNone(note.id)
         assert note.id is not None
 
         note.title = "Test note"
-        note.text = "This is the updated note."
-        note.tags = ["updated", "note"]
+        note.text = "This is the @updated @note."
 
         update_note(
             con=self.con,
@@ -77,25 +77,24 @@ class TestDB(TestCase):
         retrieved_note = get_note_by_id(self.cur, note.id)
         self.assertIsNotNone(retrieved_note)
         assert retrieved_note is not None
+        assert retrieved_note.tags is not None
 
         self.assertEqual(retrieved_note.title, "Test note")
-        self.assertEqual(retrieved_note.text, "This is the updated note.")
-        # TODO: Uncomment when tags are implemented in update_note
-        # self.assertEqual(set(retrieved_note.tags), {"updated", "note"})
+        self.assertEqual(retrieved_note.text, "This is the @updated @note.")
+        self.assertEqual(set(retrieved_note.tags), {"updated", "note"})
 
     def test_delete_unused_tags(self):
         note = create_note(
             con=self.con,
             cur=self.cur,
-            text="Test note\nThis is the initial note.",
+            text="Test note\nThis is the @initial note.",
         )
 
         self.assertIsNotNone(note.id)
         assert note.id is not None
 
         note.title = "Test note"
-        note.text = "This is the updated note."
-        note.tags = ["updated", "note"]
+        note.text = "This is the @updated @note."
 
         update_note(
             con=self.con,
@@ -106,18 +105,50 @@ class TestDB(TestCase):
         retrieved_note = get_note_by_id(self.cur, note.id)
         self.assertIsNotNone(retrieved_note)
         assert retrieved_note is not None
+        assert retrieved_note.tags is not None
 
         self.assertEqual(retrieved_note.title, "Test note")
-        self.assertEqual(retrieved_note.text, "This is the updated note.")
-        # TODO: Uncomment when tags are implemented in update_note
-        # self.assertEqual(set(retrieved_note.tags), {"updated", "note"})
+        self.assertEqual(retrieved_note.text, "This is the @updated @note.")
+        self.assertEqual(set(retrieved_note.tags), {"updated", "note"})
 
-        # TODO: Uncomment when tags are implemented in update_note
-        # all_tags = set(get_all_tags(self.cur))
-        # self.assertEqual(all_tags, {"initial", "updated", "note"})
+        # After updating the note, the "initial" tag should be unused and deleted
+        all_tags = set([tag.name for tag in get_all_tags(self.cur)])
+        self.assertEqual(all_tags, {"updated", "note"})
 
-        # delete_unused_tags(self.con, self.cur)
+    def test_get_note_by_tag(self):
+        note1 = create_note(
+            con=self.con,
+            cur=self.cur,
+            text="Test note 1\nThis is the @first note.",
+        )
 
-        # TODO: Uncomment when tags are implemented in update_note
-        # all_tags_after_deletion = set(get_all_tags(self.cur))
-        # self.assertEqual(all_tags_after_deletion, {"updated", "note"})
+        note2 = create_note(
+            con=self.con,
+            cur=self.cur,
+            text="Test note 2\nThis is the @second note.",
+        )
+
+        note3 = create_note(
+            con=self.con,
+            cur=self.cur,
+            text="Test note 3\nThis is the @third note with a @second tag.",
+        )
+
+        notes_with_first_tag = get_notes_by_tags(self.cur, ["first"])
+        self.assertEqual(len(notes_with_first_tag), 1)
+        self.assertEqual(notes_with_first_tag[0].id, note1.id)
+
+        notes_with_second_tag = get_notes_by_tags(self.cur, ["second"])
+        self.assertEqual(len(notes_with_second_tag), 2)
+        note_ids_with_second_tag = {note.id for note in notes_with_second_tag}
+        self.assertEqual(note_ids_with_second_tag, {note2.id, note3.id})
+
+        notes_with_third_tag = get_notes_by_tags(self.cur, ["third"])
+        self.assertEqual(len(notes_with_third_tag), 1)
+        self.assertEqual(notes_with_third_tag[0].id, note3.id)
+
+        notes_with_third_and_second_tags = get_notes_by_tags(
+            self.cur, ["third", "second"]
+        )
+        self.assertEqual(len(notes_with_third_and_second_tags), 1)
+        self.assertEqual(notes_with_third_and_second_tags[0].id, note3.id)

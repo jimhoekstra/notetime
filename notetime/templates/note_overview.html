@@ -9,6 +9,8 @@
             </div>
         </div>
         {{ widgets["note-search-input"] | safe }}
+
+        {{ widgets["tag-list"] | safe }}
         {{ widgets["note-grid"] | safe }}
     </div>
     
@@ -50,5 +52,9 @@
     .space-between {
         justify-content: space-between;
         align-items: end;
+    }
+
+    ul li {
+        display: inline-block;
     }
 </style>

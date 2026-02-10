@@ -2,6 +2,8 @@ import sqlite3
 from pathlib import Path
 from datetime import datetime, timezone
 
+from notetime.tags import extract_tags
+
 from pydantic import BaseModel, Field
 
 
@@ -27,7 +29,7 @@ class Note(BaseModel):
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     title: str = ""
     text: str = ""
-    tags: list[str] = []
+    tags: list[str] | None = None
 
     def set_updated_at_now(self) -> None:
         self.updated_at = datetime.now(timezone.utc)
@@ -39,6 +41,28 @@ class Note(BaseModel):
             return self.title
         else:
             return self.text
+
+    def set_tags_from_text(self) -> None:
+        self.tags = extract_tags(self.get_full_text())
+
+    def fetch_tags_from_db(self, cur: sqlite3.Cursor) -> None:
+        assert self.id is not None
+        cur.execute(
+            """
+            SELECT t.name FROM tags t
+            JOIN note_tags nt ON t.id = nt.tag_id
+            WHERE nt.note_id = ?
+            """,
+            (self.id,),
+        )
+        tags = [tag_row[0] for tag_row in cur.fetchall()]
+        self.tags = tags
+
+
+class Tag(BaseModel):
+    id: int | None = None
+    name: str
+    num_notes: int = 0
 
 
 CREATE_NOTES = """
@@ -132,13 +156,13 @@ def update_note_tags(
 
     cur.execute("COMMIT;")
     con.commit()
+    delete_unused_tags(con, cur)
 
 
 def create_note(
     con: sqlite3.Connection,
     cur: sqlite3.Cursor,
     text: str,
-    tags: list[str] = [],
 ) -> Note:
     title = text.splitlines()[0] if text else ""
     if len(text.splitlines()) > 1:
@@ -150,8 +174,10 @@ def create_note(
         id=None,
         title=title,
         text=text,
-        tags=tags,
     )
+
+    note.set_tags_from_text()
+    assert note.tags is not None
 
     cur.execute(
         "INSERT INTO notes (title, text, created_at, updated_at) VALUES (?, ?, ?, ?)",
@@ -161,8 +187,11 @@ def create_note(
 
     note_id = cur.lastrowid
     assert note_id is not None
-
     note.id = note_id
+
+    tag_ids = upsert_tags(con=con, cur=cur, tags=note.tags)
+    update_note_tags(con=con, cur=cur, note_id=note.id, tag_ids=tag_ids)
+
     return note
 
 
@@ -172,6 +201,8 @@ def update_note(
     note: Note,
 ) -> Note:
     assert note.id is not None
+    note.set_tags_from_text()
+    assert note.tags is not None
 
     note.set_updated_at_now()
     cur.execute(
@@ -200,31 +231,64 @@ def get_note_by_id(
     if row is None:
         return None
 
-    cur.execute(
-        """
-        SELECT t.name FROM tags t
-        JOIN note_tags nt ON t.id = nt.tag_id
-        WHERE nt.note_id = ?
-        """,
-        (note_id,),
-    )
-    tags = [tag_row[0] for tag_row in cur.fetchall()]
-
-    return Note(
+    note = Note(
         id=row[0],
         created_at=row[1],
         updated_at=row[2],
         title=row[3] or "",
         text=row[4] or "",
-        tags=tags,
     )
+    note.fetch_tags_from_db(cur)
+    return note
+
+
+def get_notes_by_tags(
+    cur: sqlite3.Cursor,
+    tag_names: list[str],
+) -> list[Note]:
+    q = f"""
+        SELECT n.id, n.created_at, n.updated_at, n.title, n.text FROM notes n
+        JOIN note_tags nt ON n.id = nt.note_id
+        JOIN tags t ON nt.tag_id = t.id
+        WHERE t.name IN ({",".join("?" for _ in tag_names)})
+        GROUP BY n.id
+        HAVING COUNT(DISTINCT t.id) = ?
+        """
+
+    cur.execute(
+        q,
+        tag_names + [len(tag_names)],
+    )
+
+    notes = []
+    for row in cur.fetchall():
+        note = Note(
+            id=row[0],
+            created_at=row[1],
+            updated_at=row[2],
+            title=row[3] or "",
+            text=row[4] or "",
+        )
+        notes.append(note)
+
+    return notes
 
 
 def get_all_tags(
     cur: sqlite3.Cursor,
-) -> list[str]:
-    cur.execute("SELECT name FROM tags")
-    return [row[0] for row in cur.fetchall()]
+) -> list[Tag]:
+    cur.execute("SELECT id, name FROM tags")
+
+    tags = [
+        Tag(
+            id=row[0],
+            name=row[1],
+            num_notes=len(get_notes_by_tags(cur, [row[1]])),
+        )
+        for row in cur.fetchall()
+    ]
+
+    return sorted(tags, key=lambda tag: tag.num_notes, reverse=True)
 
 
 def delete_unused_tags(

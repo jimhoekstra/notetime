@@ -7,6 +7,7 @@ from newsflash.widgets import (
     Input,
     Button,
     Notifications,
+    List,
     Grid,
     BarChart,
     Paragraph,
@@ -20,6 +21,8 @@ from notetime.db import (
     get_note_by_id,
     get_in_progress_note,
     get_all_notes,
+    get_all_tags,
+    get_notes_by_tags,
 )
 
 
@@ -45,7 +48,7 @@ class NoteIDInput(Input):
 
 class NoteTextArea(TextArea):
     id: str = "note-textarea"
-    rows: int = 20
+    rows: int = 18
     autofocus: bool = True
     placeholder: str = "write a new note..."
 
@@ -81,7 +84,7 @@ class NoteTextArea(TextArea):
 
         con.close()
         note_description.text = f"Editing note: {current_note.title} (id: {current_note.id}). Last updated at {updated_note.updated_at.strftime('%Y-%m-%d %H:%M:%S')}."
-        
+
         if note_id == 1:
             return []
         else:
@@ -209,8 +212,14 @@ class NoteGrid(Grid[NoteWidget]):
     item_type: Type[NoteWidget] = NoteWidget
 
     def _post_init(self) -> None:
+        current_tags: list[str] = self.root_widget.query_params.get("tag", [])
+
         con, cur = get_db_connection()
-        all_notes = get_all_notes(cur=cur)
+        if len(current_tags) > 0:
+            all_notes = get_notes_by_tags(cur=cur, tag_names=current_tags)
+        else:
+            all_notes = get_all_notes(cur=cur)
+
         con.close()
 
         self.items = [
@@ -229,6 +238,55 @@ class NoteGrid(Grid[NoteWidget]):
 class NoteDescription(Paragraph):
     id: str = "note-description"
     text: str = ""
+
+
+class TagButton(Widget):
+    template: tuple[str, str] = ("templates", "tag_widget.html")
+    id: str = "tag-button"
+    label: str = "Tag"
+    num_notes: int = 0
+    url: str = "/notes"
+    active: bool
+
+    include_in_context: set[str] = {"id", "label", "num_notes", "url", "active"}
+
+
+class TagList(List[TagButton]):
+    id: str = "tag-list"
+    item_type: Type[TagButton] = TagButton
+
+    def _post_init(self) -> None:
+        super()._post_init()
+
+        current_tags: list[str] = self.root_widget.query_params.get("tag", [])
+
+        def get_new_tag_list(tag_name: str) -> list[str]:
+            if tag_name in current_tags:
+                return [t for t in current_tags if t != tag_name]
+            else:
+                return current_tags + [tag_name]
+
+        def get_new_url(tag_name: str) -> str:
+            new_tags = get_new_tag_list(tag_name)
+            if len(new_tags) > 0:
+                return f"/notes?{'&'.join([f'tag={t}' for t in new_tags])}"
+            else:
+                return "/notes"
+
+        con, cur = get_db_connection()
+        all_tags = get_all_tags(cur=cur)
+        con.close()
+
+        self.items = [
+            TagButton(
+                id=f"tag-{tag.name}-button",
+                label=tag.name,
+                num_notes=tag.num_notes,
+                url=get_new_url(tag.name),
+                active=tag.name in current_tags,
+            )
+            for tag in all_tags
+        ]
 
 
 class NewNotePage(Page):
@@ -260,16 +318,19 @@ class NewNotePage(Page):
         return super()._post_init()
 
 
-note_overview_page = Page(
-    id="note-overview-page",
-    path="/notes",
-    title="Note Overview",
-    template=("templates", "note_overview.html"),
-    children=[
-        NoteSearchInput(),
-        NoteGrid(),
-    ],
-)
+class NoteOverviewPage(Page):
+    id: str = "note-overview-page"
+    path: str = "/notes"
+    title: str = "Note Overview"
+    template: tuple[str, str] = ("templates", "note_overview.html")
+
+    def _post_init(self) -> None:
+        self.children = [
+            NoteSearchInput(parent=self),
+            NoteGrid(parent=self),
+            TagList(parent=self),
+        ]
+        return super()._post_init()
 
 
 class TestBar(BarChart):
@@ -296,6 +357,6 @@ stats_page = Page(
 )
 
 app = App(
-    pages=[NewNotePage(), note_overview_page, stats_page],
+    pages=[NewNotePage(), NoteOverviewPage(), stats_page],
     template_folders=[("templates", Path.cwd() / "notetime" / "templates")],
 )

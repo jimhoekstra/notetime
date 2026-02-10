@@ -1,0 +1,12 @@
+<a href="{{ url }}" style="
+display: inline-block;
+padding: 4px 6px;
+border-radius: 0.25em;
+border-width: 1px;
+border-style: solid;
+{% if active %}border-color: black;{% else %}border-color: rgba(0, 0, 0, 0.5);{% endif %}
+{% if active %}color: black;{% else %}color: rgba(0, 0, 0, 0.5);{% endif %}
+{% if active %}background-color: hsl(213, 44%, 80%);{% endif %}
+">
+    {{ label }} ({{ num_notes }})
+</a>
