@@ -52,7 +52,7 @@ class NoteTextArea(TextArea):
     def on_input(
         self,
         note_id_input: NoteIDInput,
-        notifications: Notifications,
+        note_description: "NoteDescription",
     ) -> list[Widget]:
         assert self.value is not None
         note_id = int(note_id_input.value)
@@ -79,10 +79,13 @@ class NoteTextArea(TextArea):
             note=current_note,
         )
 
-        notifications.push(f"Updated note {updated_note.id}")
-
         con.close()
-        return [notifications]
+        note_description.text = f"Editing note: {current_note.title} (id: {current_note.id}). Last updated at {updated_note.updated_at.strftime('%Y-%m-%d %H:%M:%S')}."
+        
+        if note_id == 1:
+            return []
+        else:
+            return [note_description]
 
 
 class SaveButton(Button):
