@@ -37,8 +37,7 @@ def save_new_note(
         raise HTTPException(status_code=400, detail="new note cannot be empty")
     elif note_id_input.value != "" and note_text == "":
         path.unlink()
-        yield Notification(message="Note deleted")
-
+        
         # Refresh the page
         yield Page(path="/")
     else:
