@@ -1,9 +1,7 @@
 from typing import Iterable
 
-from newsflash.elements import Input, Textarea, Button, Vertical, Link
+from newsflash.elements import Input, Textarea, Button, Horizontal
 from newsflash.models import Element
-
-from .constants import PATH_TO_NOTES
 
 
 class NoteIDInput(Input):
@@ -17,21 +15,20 @@ class NoteTextarea(Textarea):
     rows: int = 15
 
 
+class NewNoteButton(Button):
+    id: str = "new-note-button"
+    label: str = "New"
+
+
 class SaveNoteButton(Button):
     id: str = "save-note-button"
     label: str = "Save"
 
 
-class NotesList(Vertical):
-    id: str = "notes-list"
+class NoteEditorButtons(Horizontal):
+    id: str = "note-editor-buttons"
+    flex_sizes: list[int] = [1, 1]
 
     def compose(self) -> Iterable[Element]:
-        all_note_files = sorted(PATH_TO_NOTES.glob("*.md"), key=lambda x: x.stat().st_mtime, reverse=True)
-        all_note_ids = [note_file.name.removesuffix(".md") for note_file in all_note_files]
-            
-        for note_id in all_note_ids:
-            yield Link(
-                id=f"note-link-{note_id}",
-                href=f"/?note-id={note_id}",
-                text=(PATH_TO_NOTES / f"{note_id}.md").read_text()[:100],
-            )
+        yield NewNoteButton()
+        yield SaveNoteButton()

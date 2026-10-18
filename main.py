@@ -1,11 +1,10 @@
 from newsflash import NewsflashApp
-
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
-from notetime.pages import NoteEditorPage
+from notetime.pages import NoteEditorPage, SearchPage
 
 
-app = NewsflashApp(pages=[NoteEditorPage])
+app = NewsflashApp(pages=[NoteEditorPage, SearchPage])
 
 app.add_middleware(
     TrustedHostMiddleware,
