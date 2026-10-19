@@ -2,10 +2,10 @@ from typing import Iterable
 
 from newsflash.models import Element
 from newsflash.functions import FunctionRegistry
-from local_llm.model_endpoints import retrieve
 
 from notetime.constants import PATH_TO_NOTES
 from notetime.models import Note
+from notetime.embeddings import retrieve
 
 from .elements import SearchInput, NoteSummaryList
 
@@ -30,4 +30,6 @@ def search_notes(search_input: SearchInput) -> Iterable[Element]:
     )
 
     matched_notes = [notes[match.index] for match in matches]
+    for idx, note in enumerate(matched_notes):
+        note.title += f" ({matches[idx].score:.3f})"
     yield NoteSummaryList(notes=matched_notes)

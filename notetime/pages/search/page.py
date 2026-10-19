@@ -2,6 +2,7 @@ from typing import Iterable
 
 from newsflash import Page, FunctionRegistry
 from newsflash.models import Element
+from newsflash.elements import NotificationContainer
 
 from notetime.elements.page_header import PageHeader
 from notetime.models import Note
@@ -25,3 +26,4 @@ class SearchPage(Page):
             notes.append(Note.load_from(path=file))
 
         yield NoteSummaryList(notes=notes)
+        yield NotificationContainer()

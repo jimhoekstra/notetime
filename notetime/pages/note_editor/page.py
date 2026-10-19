@@ -32,5 +32,4 @@ class NoteEditorPage(Page):
         yield NoteIDInput(value=note_id)
         yield NoteTextarea(value=note_text, autofocus=note_id == "")
         yield NoteEditorButtons()
-
         yield NotificationContainer()
